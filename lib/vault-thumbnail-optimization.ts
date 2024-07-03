@@ -6,6 +6,8 @@ import { CfnDistribution } from "aws-cdk-lib/aws-cloudfront";
 import { Construct } from 'constructs';
 import { getOriginShieldRegion } from './origin-shield';
 import { createHash } from 'crypto';
+import { ComputeEnvironmentBase } from 'aws-cdk-lib/aws-batch';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 
 // Stack Parameters
 
@@ -14,18 +16,19 @@ var STORE_TRANSFORMED_IMAGES = 'true';
 // Parameters of S3 bucket where original images are stored
 var S3_IMAGE_BUCKET_NAME: string;
 var S3_IMAGE_DESTINATION_BUCKET_NAME: string;
+var LAMBDA_NAME: string;
 // CloudFront parameters
 var CLOUDFRONT_ORIGIN_SHIELD_REGION = getOriginShieldRegion(process.env.AWS_REGION || process.env.CDK_DEFAULT_REGION || 'us-east-1');
 var CLOUDFRONT_CORS_ENABLED = 'true';
 // Parameters of transformed images
-var S3_TRANSFORMED_IMAGE_EXPIRATION_DURATION = '90';
+var S3_TRANSFORMED_IMAGE_EXPIRATION_DURATION = '365';
 var S3_TRANSFORMED_IMAGE_CACHE_TTL = 'max-age=31622400';
 // Max image size in bytes. If generated images are stored on S3, bigger images are generated, stored on S3
 // and request is redirect to the generated image. Otherwise, an application error is sent.
 var MAX_IMAGE_SIZE = '4700000';
 // Lambda Parameters
 var LAMBDA_MEMORY = '1500';
-var LAMBDA_TIMEOUT = '60';
+var LAMBDA_TIMEOUT = '30';
 // Whether to deploy a sample website referenced in https://aws.amazon.com/blogs/networking-and-content-delivery/image-optimization-using-amazon-cloudfront-and-aws-lambda/
 var DEPLOY_SAMPLE_WEBSITE = 'false';
 
@@ -35,6 +38,7 @@ type ImageDeliveryCacheBehaviorConfig = {
   cachePolicy: any;
   functionAssociations: any;
   responseHeadersPolicy?: any;
+  trustedKeyGroups: any;
 };
 
 type LambdaEnv = {
@@ -74,7 +78,7 @@ export class ImageOptimizationStack extends Stack {
 
       var sampleWebsiteDelivery = new cloudfront.Distribution(this, 'websiteDeliveryDistribution', {
         comment: 'image optimization - sample website',
-        defaultRootObject: 'index.html',
+        defaultRootObject: 'index.html',       
         defaultBehavior: {
           origin: new origins.S3Origin(sampleWebsiteBucket),
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -157,6 +161,7 @@ export class ImageOptimizationStack extends Stack {
 
     // Create Lambda for image processing
     var lambdaProps = {
+      functionName: 'vault-thumbnail-optimization',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('functions/image-processing'),
@@ -164,8 +169,9 @@ export class ImageOptimizationStack extends Stack {
       memorySize: parseInt(LAMBDA_MEMORY),
       environment: lambdaEnv,
       logRetention: logs.RetentionDays.ONE_DAY,
-    };
-    var imageProcessing = new lambda.Function(this, 'image-optimization', lambdaProps);
+    };  
+
+    var imageProcessing = new lambda.Function(this, 'vault-thumbnail-optimization', lambdaProps);
 
     // Enable Lambda URL
     const imageProcessingURL = imageProcessing.addFunctionUrl();
@@ -207,14 +213,20 @@ export class ImageOptimizationStack extends Stack {
     );
 
     // Create a CloudFront Function for url rewrites
-    const urlRewriteFunction = new cloudfront.Function(this, 'urlRewrite', {
+    const urlRewriteFunction = new cloudfront.Function(this, 'vault-thumbnail-urlRewrite', {
       code: cloudfront.FunctionCode.fromFile({ filePath: 'functions/url-rewrite/index.js', }),
       functionName: `urlRewriteFunction${this.node.addr}`,
     });
+   
+
+    const keyGroup = cloudfront.KeyGroup.fromKeyGroupId(this, 'KeyImported', '79684031-7027-4847-8385-e945b18215ea');
 
     var imageDeliveryCacheBehaviorConfig: ImageDeliveryCacheBehaviorConfig = {
       origin: imageOrigin,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      trustedKeyGroups: [
+        keyGroup,
+      ],
       cachePolicy: new cloudfront.CachePolicy(this, `ImageCachePolicy${this.node.addr}`, {
         defaultTtl: Duration.hours(24),
         maxTtl: Duration.days(365),
@@ -242,17 +254,29 @@ export class ImageOptimizationStack extends Stack {
         // recognizing image requests that were processed by this solution
         customHeadersBehavior: {
           customHeaders: [
-            { header: 'x-aws-image-optimization', value: 'v1.0', override: true },
+            { header: 'x-aws-vault-thumbnail-optimization', value: 'v1.0', override: true },
             { header: 'vary', value: 'accept', override: true },
           ],
         }
       });
       imageDeliveryCacheBehaviorConfig.responseHeadersPolicy = imageResponseHeadersPolicy;
     }
-    const imageDelivery = new cloudfront.Distribution(this, 'imageDeliveryDistribution', {
-      comment: 'image optimization - image delivery',
-      defaultBehavior: imageDeliveryCacheBehaviorConfig
-    });
+
+
+
+    const certificateArn = "arn:aws:acm:us-east-1:607765814920:certificate/d6d898ec-b894-45e5-aaed-0da780ac3ebe";
+    const certificate = acm.Certificate.fromCertificateArn(this, 'CertificateImported', certificateArn);
+
+
+     
+    var distributionprops = {
+      domainNames: ['vault-cdn-opt.dev.eka.care'],
+      comment: 'vault thumbnail optimization',
+      defaultBehavior: imageDeliveryCacheBehaviorConfig,
+      certificate: certificate,
+    };
+
+    const imageDelivery = new cloudfront.Distribution(this, 'vault-thumbnail', distributionprops);
 
     // ADD OAC between CloudFront and LambdaURL
     const oac = new cloudfront.CfnOriginAccessControl(this, "OAC", {
@@ -273,9 +297,10 @@ export class ImageOptimizationStack extends Stack {
       sourceArn: `arn:aws:cloudfront::${this.account}:distribution/${imageDelivery.distributionId}`
     })
 
-    new CfnOutput(this, 'ImageDeliveryDomain', {
-      description: 'Domain name of image delivery',
+    new CfnOutput(this, 'vault-thumbnail-url', {
+      description: 'Domain name of vault-thumbnail optimization',
       value: imageDelivery.distributionDomainName
     });
+
   }
 }
