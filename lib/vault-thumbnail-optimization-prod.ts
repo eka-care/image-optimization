@@ -30,9 +30,6 @@ var MAX_IMAGE_SIZE = '4700000';
 var LAMBDA_MEMORY = '1500';
 var LAMBDA_TIMEOUT = '30';
 // Whether to deploy a sample website referenced in https://aws.amazon.com/blogs/networking-and-content-delivery/image-optimization-using-amazon-cloudfront-and-aws-lambda/
-var DEPLOY_SAMPLE_WEBSITE = 'false';
-
-
 
 
 type ImageDeliveryCacheBehaviorConfig = {
@@ -66,37 +63,7 @@ export class ImageOptimizationStack extends Stack {
     LAMBDA_MEMORY = this.node.tryGetContext('LAMBDA_MEMORY') || LAMBDA_MEMORY;
     LAMBDA_TIMEOUT = this.node.tryGetContext('LAMBDA_TIMEOUT') || LAMBDA_TIMEOUT;
     MAX_IMAGE_SIZE = this.node.tryGetContext('MAX_IMAGE_SIZE') || MAX_IMAGE_SIZE;
-    DEPLOY_SAMPLE_WEBSITE = this.node.tryGetContext('DEPLOY_SAMPLE_WEBSITE') || DEPLOY_SAMPLE_WEBSITE;
     
-
-    // deploy a sample website for testing if required
-    if (DEPLOY_SAMPLE_WEBSITE === 'true') {
-      var sampleWebsiteBucket = new s3.Bucket(this, 's3-sample-website-bucket', {
-        removalPolicy: RemovalPolicy.DESTROY,
-        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-        encryption: s3.BucketEncryption.S3_MANAGED,
-        enforceSSL: true,
-        autoDeleteObjects: true,
-      });
-
-      var sampleWebsiteDelivery = new cloudfront.Distribution(this, 'websiteDeliveryDistribution', {
-        comment: 'image optimization - sample website',
-        defaultRootObject: 'index.html',       
-        defaultBehavior: {
-          origin: new origins.S3Origin(sampleWebsiteBucket),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        }
-      });
-
-      new CfnOutput(this, 'SampleWebsiteDomain', {
-        description: 'Sample website domain',
-        value: sampleWebsiteDelivery.distributionDomainName
-      });
-      new CfnOutput(this, 'SampleWebsiteS3Bucket', {
-        description: 'S3 bucket use by the sample website',
-        value: sampleWebsiteBucket.bucketName
-      });
-    }
 
     // For the bucket having original images, either use an external one, or create one with some samples photos.
     var originalImageBucket;
@@ -145,7 +112,7 @@ export class ImageOptimizationStack extends Stack {
       console.log(`destination bucket ${(transformedImageBucket)}`);;
     }
 
-    // prepare env variable for Lambda 
+    // prepare env variable for Lambda
     var lambdaEnv: LambdaEnv = {
       originalImageBucketName: originalImageBucket.bucketName,
       transformedImageCacheTTL: S3_TRANSFORMED_IMAGE_CACHE_TTL,
@@ -222,7 +189,7 @@ export class ImageOptimizationStack extends Stack {
     });
    
 
-    const keyGroup = cloudfront.KeyGroup.fromKeyGroupId(this, 'KeyImported', '79684031-7027-4847-8385-e945b18215ea');
+    const keyGroup = cloudfront.KeyGroup.fromKeyGroupId(this, 'KeyImported', '3d33e353-ddde-4c1c-ac1c-f5f1df329554');
 
     var imageDeliveryCacheBehaviorConfig: ImageDeliveryCacheBehaviorConfig = {
       origin: imageOrigin,
@@ -267,13 +234,13 @@ export class ImageOptimizationStack extends Stack {
 
 
 
-    const certificateArn = "arn:aws:acm:us-east-1:607765814920:certificate/d6d898ec-b894-45e5-aaed-0da780ac3ebe";
+    const certificateArn = "arn:aws:acm:us-east-1:920707184328:certificate/e4f580b1-4cdc-4400-a3a7-498c855e0619";
     const certificate = acm.Certificate.fromCertificateArn(this, 'CertificateImported', certificateArn);
 
 
      
     var distributionprops = {
-      domainNames: ['vault-cdn-opt.dev.eka.care'],
+      domainNames: ['vault-cdn-mini.eka.care'],
       comment: 'vault thumbnail optimization',
       defaultBehavior: imageDeliveryCacheBehaviorConfig,
       certificate: certificate,
