@@ -48,7 +48,7 @@ type LambdaEnv = {
   maxImageSize: string,
 }
 
-export class ImageOptimizationStack extends Stack {
+export class ImageOptimizationProdStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
