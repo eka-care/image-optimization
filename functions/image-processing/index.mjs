@@ -98,7 +98,7 @@ export const handler = async (event) => {
             const putImageCommand = new PutObjectCommand({
                 Body: transformedImage,
                 Bucket: S3_TRANSFORMED_IMAGE_BUCKET,
-                Key: originalImagePath + '/' + operationsPrefix,
+                Key: originalImagePath,
                 ContentType: contentType,
                 Metadata: {
                     'cache-control': TRANSFORMED_IMAGE_CACHE_TTL,
