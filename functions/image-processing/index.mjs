@@ -75,10 +75,10 @@ export const handler = async (event) => {
             } else transformedImage = transformedImage.toFormat(operationsJSON['format']);
         }
         transformedImage = transformedImage
-            .resize(250, null)
+            .resize(300, null)
             .png({
-                compressionLevel: 9, // Set compression level between 0 and 9
-                quality: 10 // Quality setting for PNG, between 0 and 100
+                compressionLevel: 8, // Set compression level between 0 and 9
+                quality: 30 // Quality setting for PNG, between 0 and 100
             });
         transformedImage = await transformedImage.toBuffer();
     } catch (error) {
