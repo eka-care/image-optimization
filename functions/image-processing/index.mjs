@@ -15,12 +15,15 @@ export const handler = async (event) => {
     if (!event.requestContext || !event.requestContext.http || !(event.requestContext.http.method === 'GET')) return sendError(400, 'Only GET method is supported', event);
     // An example of expected path is /images/rio/1.jpeg/format=auto,width=100 or /images/rio/1.jpeg/original where /images/rio/1.jpeg is the path of the original image
     var imagePathArray = event.requestContext.http.path.split('/');
+    console.log(`initial array imagePathArray ${imagePathArray}`);
     // get the requested image operations
     var operationsPrefix = imagePathArray.pop();
     // get the original image path images/rio/1.jpg
+    console.log(`before shift ${imagePathArray}`);
     imagePathArray.shift();
+    console.log(`after shift ${imagePathArray}`);
     var originalImagePath = imagePathArray.join('/');
-
+    console.log(`after join ${originalImagePath}`);
     var startTime = performance.now();
     // Downloading original image
     let originalImageBody;
