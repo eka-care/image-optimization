@@ -24,12 +24,13 @@ export const handler = async (event) => {
     console.log(`after shift ${imagePathArray}`);
     var originalImagePath = imagePathArray.join('/');
     console.log(`after join ${originalImagePath}`);
+    console.log(`operationsPrefix ${operationsPrefix}`);
     var startTime = performance.now();
     // Downloading original image
     let originalImageBody;
     let contentType;
     try {
-        const getOriginalImageCommand = new GetObjectCommand({ Bucket: S3_ORIGINAL_IMAGE_BUCKET, Key: originalImagePath });
+        const getOriginalImageCommand = new GetObjectCommand({ Bucket: S3_ORIGINAL_IMAGE_BUCKET, Key: originalImagePath + '/' + operationsPrefix });
         const getOriginalImageCommandOutput = await s3Client.send(getOriginalImageCommand);
         console.log(`Got response from S3 for ${originalImagePath}`);
 
